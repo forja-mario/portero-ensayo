@@ -1,0 +1,51 @@
+name: Portero desde main
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Sintaxis del cambio
+        run: python3 -m py_compile valor.py
+      - name: Contraprueba fijada en main
+        run: |
+          git show HEAD^1:test_valor.py > test_valor.py
+          python3 -m unittest -q test_valor
+      - name: Integridad del cambio
+        run: git diff --check HEAD^1 HEAD
+
+  sello:
+    needs: [pruebas]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Atestar el resultado estricto de la fusion
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FORJA_NEEDS_JSON: ${{ toJSON(needs) }}
+        run: python3 .github/scripts/atesta_ensayo.py
