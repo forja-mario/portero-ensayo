@@ -1,1 +1,1 @@
-VALOR = 1
+VALOR = 0
